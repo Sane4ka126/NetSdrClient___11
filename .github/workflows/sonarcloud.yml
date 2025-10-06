@@ -2,13 +2,10 @@
 # They are provided by a third-party and are governed by
 # separate terms of service, privacy policy, and support
 # documentation.
-
 # This workflow helps you trigger a SonarCloud analysis of your code and populates
 # GitHub Code Scanning alerts with the vulnerabilities found.
 # Free for open source project.
-
 # 1. Login to SonarCloud.io using your GitHub account
-
 # 2. Import your project on SonarCloud
 #     * Add your GitHub organization first, then add your repository as a new project.
 #     * Please note that many languages are eligible for automatic analysis,
@@ -22,23 +19,17 @@
 #     * b. Generate a new token and add it to your Github repository's secrets using the name SONAR_TOKEN
 #          (On SonarCloud, click on your avatar on top-right > My account > Security
 #           or go directly to https://sonarcloud.io/account/security/)
-
 # Feel free to take a look at our documentation (https://docs.sonarcloud.io/getting-started/github/)
 # or reach out to our community forum if you need some help (https://community.sonarsource.com/c/help/sc/9)
-
-
 name: SonarCloud analysis
-
 on:
   push:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
   workflow_dispatch:
-
 permissions:
   pull-requests: read # allows SonarCloud to decorate PRs with analysis results
-
 jobs:
   sonar-check:
     name: Sonar Check
@@ -46,11 +37,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-
       # 1) BEGIN: SonarScanner for .NET
       - name: SonarScanner Begin
         run: |
@@ -60,7 +49,9 @@ jobs:
           /k:"Sane4ka126_NetSdrClient___11" `
           /o:"sane4ka126" `
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}" `
-          /d:sonar.cs.opencover.reportsPaths="**/coverage.xml" `
+          /d:sonar.host.url="https://sonarcloud.io" `
+          /d:sonar.cs.opencover.reportsPaths="**/TestResults/coverage.xml" `
+          /d:sonar.coverage.exclusions="**/*Tests.cs,**/*Test.cs" `
           /d:sonar.cpd.cs.minimumTokens=40 `
           /d:sonar.cpd.cs.minimumLines=5 `
           /d:sonar.exclusions=**/bin/**,**/obj/**,**/sonarcloud.yml `
@@ -75,8 +66,24 @@ jobs:
         run: |
           dotnet test NetSdrClientAppTests/NetSdrClientAppTests.csproj -c Release --no-build `
             /p:CollectCoverage=true `
-            /p:CoverletOutput=TestResults/coverage.xml `
+            /p:CoverletOutput=TestResults/ `
             /p:CoverletOutputFormat=opencover
+        shell: pwsh
+      # 2.1) Verify coverage file was created
+      - name: Verify coverage file
+        run: |
+          Write-Host "=== Searching for coverage files ===" -ForegroundColor Cyan
+          Get-ChildItem -Path . -Filter "coverage.xml" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "Found coverage file: $($_.FullName)" -ForegroundColor Green
+            Write-Host "File size: $($_.Length) bytes" -ForegroundColor Green
+            if ($_.Length -gt 0) {
+              Write-Host "First few lines:" -ForegroundColor Yellow
+              Get-Content $_.FullName | Select-Object -First 5
+            }
+          }
+          if (-not (Test-Path "**/TestResults/coverage.xml")) {
+            Write-Host "WARNING: Coverage file not found in expected location!" -ForegroundColor Red
+          }
         shell: pwsh
       # 3) END: SonarScanner
       - name: SonarScanner End
